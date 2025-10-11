@@ -1,19 +1,28 @@
 use anchor_lang::prelude::*;
 use arcium_anchor::prelude::*;
-use arcium_client::idl::arcium::types::CallbackAccount;
+use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
 
 const COMP_DEF_OFFSET_INIT_VOTE_STATS: u32 = comp_def_offset("init_vote_stats");
 const COMP_DEF_OFFSET_VOTE: u32 = comp_def_offset("vote");
 const COMP_DEF_OFFSET_REVEAL: u32 = comp_def_offset("reveal_result");
 
-declare_id!("665esySAfjG6KFU7oGMEZNHbnK17xh92LCiXmxoUhzv8");
+declare_id!("D2FnRkvsmn7sS74ZLrXT4ioS5auJw6sFdmXwb5tqFcr3");
 
 #[arcium_program]
 pub mod voting {
     use super::*;
 
     pub fn init_vote_stats_comp_def(ctx: Context<InitVoteStatsCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, true, 0, None, None)?;
+        init_comp_def(
+            ctx.accounts,
+            true,
+            0,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/init_vote_stats_testnet.arcis".to_string(),
+                hash: [0; 32],
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -80,7 +89,16 @@ pub mod voting {
     }
 
     pub fn init_vote_comp_def(ctx: Context<InitVoteCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, true, 0, None, None)?;
+        init_comp_def(
+            ctx.accounts,
+            true,
+            0,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/vote_testnet.arcis".to_string(),
+                hash: [0; 32],
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -154,7 +172,16 @@ pub mod voting {
     }
 
     pub fn init_reveal_result_comp_def(ctx: Context<InitRevealResultCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, true, 0, None, None)?;
+        init_comp_def(
+            ctx.accounts,
+            true,
+            0,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/reveal_result_testnet.arcis".to_string(),
+                hash: [0; 32],
+            })),
+            None,
+        )?;
         Ok(())
     }
 
