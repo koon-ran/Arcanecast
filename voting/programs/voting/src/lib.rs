@@ -6,7 +6,7 @@ const COMP_DEF_OFFSET_INIT_VOTE_STATS: u32 = comp_def_offset("init_vote_stats");
 const COMP_DEF_OFFSET_VOTE: u32 = comp_def_offset("vote");
 const COMP_DEF_OFFSET_REVEAL: u32 = comp_def_offset("reveal_result");
 
-declare_id!("D2FnRkvsmn7sS74ZLrXT4ioS5auJw6sFdmXwb5tqFcr3");
+declare_id!("FHuabcvigE645KXLy4KCFCLkLx1jLxi1nwFYs8ajWyYd");
 
 #[arcium_program]
 pub mod voting {
@@ -304,7 +304,7 @@ pub struct CreateNewPoll<'info> {
         init,
         payer = payer,
         space = 8 + PollAccount::INIT_SPACE,
-        seeds = [b"poll", payer.key().as_ref(), id.to_le_bytes().as_ref()],
+        seeds = [b"poll", id.to_le_bytes().as_ref()],
         bump,
     )]
     pub poll_acc: Account<'info, PollAccount>,
@@ -401,15 +401,9 @@ pub struct Vote<'info> {
     pub clock_account: Account<'info, ClockAccount>,
     pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
-    /// CHECK: Poll authority pubkey
     #[account(
-        address = poll_acc.authority,
-    )]
-    pub authority: UncheckedAccount<'info>,
-    #[account(
-        seeds = [b"poll", authority.key().as_ref(), _id.to_le_bytes().as_ref()],
+        seeds = [b"poll", _id.to_le_bytes().as_ref()],
         bump = poll_acc.bump,
-        has_one = authority
     )]
     pub poll_acc: Account<'info, PollAccount>,
 }
@@ -505,7 +499,7 @@ pub struct RevealVotingResult<'info> {
     pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
     #[account(
-        seeds = [b"poll", payer.key().as_ref(), id.to_le_bytes().as_ref()],
+        seeds = [b"poll", id.to_le_bytes().as_ref()],
         bump = poll_acc.bump
     )]
     pub poll_acc: Account<'info, PollAccount>,

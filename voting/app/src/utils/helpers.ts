@@ -62,16 +62,14 @@ export function deriveArciumAccounts(
 }
 
 /**
- * Derive poll PDA
+ * Derive poll PDA (globally accessible by poll ID only)
  */
 export function derivePollPDA(
-  authority: PublicKey,
   pollId: number
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from("poll"),
-      authority.toBuffer(),
       new BN(pollId).toArrayLike(Buffer, "le", 4),
     ],
     VOTING_PROGRAM_ID

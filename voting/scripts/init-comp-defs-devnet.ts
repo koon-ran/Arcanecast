@@ -35,7 +35,7 @@ async function main() {
   });
   anchor.setProvider(provider);
 
-  const programId = new PublicKey("D2FnRkvsmn7sS74ZLrXT4ioS5auJw6sFdmXwb5tqFcr3");
+  const programId = new PublicKey("FHuabcvigE645KXLy4KCFCLkLx1jLxi1nwFYs8ajWyYd");
   const idl = JSON.parse(fs.readFileSync("target/idl/voting.json", "utf8"));
   const program = new Program(idl, provider) as Program<Voting>;
 

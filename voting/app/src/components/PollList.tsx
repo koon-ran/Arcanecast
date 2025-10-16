@@ -26,14 +26,14 @@ export function PollList() {
       if (filterAuthority) {
         try {
           const authorityPubkey = new PublicKey(filterAuthority);
-          fetchedPolls = await votingService.fetchAllPolls(authorityPubkey);
+          fetchedPolls = await votingService.fetchPollsByAuthority(authorityPubkey);
         } catch (error) {
           toast.error("Invalid authority address");
           return;
         }
       } else {
-        // Fetch user's own polls
-        fetchedPolls = await votingService.fetchAllPolls(wallet.publicKey);
+        // Fetch ALL polls (globally accessible)
+        fetchedPolls = await votingService.fetchAllPolls();
       }
 
       setPolls(

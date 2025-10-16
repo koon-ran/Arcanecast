@@ -6,11 +6,9 @@ export const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://devnet.helius-rpc.com/?api-key=98664a07-fdde-46f8-ac7d-7efd848339c4";
 
 // Program IDs
-// Program IDs
-// Program IDs
 export const VOTING_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_VOTING_PROGRAM_ID ||
-    "D2FnRkvsmn7sS74ZLrXT4ioS5auJw6sFdmXwb5tqFcr3"
+    "FHuabcvigE645KXLy4KCFCLkLx1jLxi1nwFYs8ajWyYd"
 );
 
 export const ARCIUM_PROGRAM_ID = new PublicKey(
@@ -34,6 +32,6 @@ export const ARCIUM_CLOCK_ACCOUNT = new PublicKey(
 export const CLUSTER_OFFSET = 1078779259;
 
 // Configuration
-export const COMPUTATION_TIMEOUT_MS = 60000; // 60 seconds
+export const COMPUTATION_TIMEOUT_MS = 300000; // 5 minutes (MPC can be slow on devnet)
 export const POLL_REFRESH_INTERVAL_MS = 5000; // 5 seconds
 export const MAX_QUESTION_LENGTH = 50;

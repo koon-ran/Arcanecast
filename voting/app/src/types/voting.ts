@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/voting.json`.
  */
 export type Voting = {
-  "address": "D2FnRkvsmn7sS74ZLrXT4ioS5auJw6sFdmXwb5tqFcr3",
+  "address": "FHuabcvigE645KXLy4KCFCLkLx1jLxi1nwFYs8ajWyYd",
   "metadata": {
     "name": "voting",
     "version": "0.1.0",
@@ -121,10 +121,6 @@ export type Voting = {
                   108,
                   108
                 ]
-              },
-              {
-                "kind": "account",
-                "path": "payer"
               },
               {
                 "kind": "arg",
@@ -430,10 +426,6 @@ export type Voting = {
                 ]
               },
               {
-                "kind": "account",
-                "path": "payer"
-              },
-              {
                 "kind": "arg",
                 "path": "id"
               }
@@ -594,12 +586,6 @@ export type Voting = {
           "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
         },
         {
-          "name": "authority",
-          "relations": [
-            "pollAcc"
-          ]
-        },
-        {
           "name": "pollAcc",
           "pda": {
             "seeds": [
@@ -611,10 +597,6 @@ export type Voting = {
                   108,
                   108
                 ]
-              },
-              {
-                "kind": "account",
-                "path": "authority"
               },
               {
                 "kind": "arg",

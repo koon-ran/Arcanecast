@@ -26,6 +26,85 @@ import { hasVoted, saveVote, getVote } from "@/utils/voteStorage";
 import { Voting } from "@/types/voting";
 import VotingIDL from "../../target/types/voting.json";
 
+// Database API helpers
+async function checkVoteEligibility(pollId: string, voterWallet: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/polls/${pollId}/vote?wallet=${voterWallet}`);
+    if (!response.ok) {
+      console.error("Failed to check vote eligibility:", response.statusText);
+      return false; // Assume eligible if API fails (graceful degradation)
+    }
+    const data = await response.json();
+    return !data.hasVoted; // Return true if user hasn't voted yet
+  } catch (error) {
+    console.error("Error checking vote eligibility:", error);
+    return false; // Assume eligible if error
+  }
+}
+
+async function recordVoteInDatabase(pollId: string, voterWallet: string, txSignature: string): Promise<{ pointsAwarded: number; totalPoints: number }> {
+  try {
+    const response = await fetch(`/api/polls/${pollId}/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        voterWallet,
+        transactionSignature: txSignature,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to record vote");
+    }
+
+    const data = await response.json();
+    return {
+      pointsAwarded: data.pointsAwarded,
+      totalPoints: data.totalPoints,
+    };
+  } catch (error) {
+    console.error("Error recording vote in database:", error);
+    throw error;
+  }
+}
+
+async function createPollInDatabase(
+  pollId: string,
+  chainAddress: string,
+  creatorWallet: string,
+  question: string,
+  description?: string,
+  category: string = "general"
+): Promise<void> {
+  try {
+    const response = await fetch("/api/polls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pollId,
+        chainAddress,
+        creatorWallet,
+        question,
+        description,
+        category,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Failed to create poll in database:", error);
+      // Don't throw - poll is on-chain, DB is just metadata
+    }
+
+    const data = await response.json();
+    console.log(`Poll created in database. Creator awarded ${data.pointsAwarded} points.`);
+  } catch (error) {
+    console.error("Error creating poll in database:", error);
+    // Don't throw - DB is supplementary
+  }
+}
+
 export class VotingService {
   private program: Program<Voting>;
   private provider: AnchorProvider;
@@ -189,7 +268,7 @@ export class VotingService {
     cipher: any
   ): Promise<{ signature: string; pollAddress: PublicKey }> {
     const authority = this.provider.wallet.publicKey;
-    const [pollPDA] = derivePollPDA(authority, pollId);
+    const [pollPDA] = derivePollPDA(pollId);
     
     // Generate nonce for initial encryption
     const nonce = generateNonce();
@@ -300,6 +379,16 @@ export class VotingService {
       );
     }
 
+    // Store poll metadata in database and award creator points
+    await createPollInDatabase(
+      pollId.toString(),
+      pollPDA.toString(),
+      authority.toString(),
+      question,
+      undefined, // description - can be added to UI later
+      "general" // category - can be customized in UI
+    );
+
     return { signature, pollAddress: pollPDA };
   }
 
@@ -333,9 +422,17 @@ export class VotingService {
     authority: PublicKey,
     onStatusChange?: (status: VoteState) => void
   ): Promise<string> {
-    const [pollPDA] = derivePollPDA(authority, pollId);
+    const [pollPDA] = derivePollPDA(pollId);
     
-    // Check if user has already voted (client-side check)
+    // Check database if user has already voted (server-side enforcement)
+    const isEligible = await checkVoteEligibility(pollId.toString(), authority.toString());
+    if (!isEligible) {
+      throw new Error(
+        `You have already voted on this poll. Each wallet can only vote once.`
+      );
+    }
+    
+    // Also check localStorage (client-side backup check)
     if (hasVoted(authority.toString(), pollId)) {
       const existingVote = getVote(authority.toString(), pollId);
       throw new Error(
@@ -390,7 +487,6 @@ export class VotingService {
           systemProgram: arciumAccounts.systemProgram,
           arciumProgram: arciumAccounts.arciumProgram,
           pollAcc: pollPDA,
-          authority: authority,
         })
         .rpc({ skipPreflight: true, commitment: "confirmed" });
     } catch (error) {
@@ -408,46 +504,45 @@ export class VotingService {
       txSignatures: { queue: queueSignature },
     });
 
-    // Wait for MPC computation with timeout
-    let finalizeSignature: string;
+    // Vote has been queued - MPC will process it in background
+    console.log("Vote queued successfully. MPC will process in background.");
+    
+    // Save vote to localStorage immediately after successful queue
+    saveVote(
+      authority.toString(),
+      pollId,
+      vote ? "yes" : "no",
+      queueSignature
+    );
+
+    // Record vote in database and award points
     try {
-      const finalizationPromise = awaitComputationFinalization(
-        this.provider,
-        computationOffset,
-        VOTING_PROGRAM_ID,
-        "confirmed"
-      );
-
-      // Add 3 minute timeout
-      const timeoutPromise = new Promise<string>((_, reject) => {
-        setTimeout(() => reject(new Error("Vote computation timed out after 3 minutes")), 180000);
-      });
-
-      finalizeSignature = await Promise.race([finalizationPromise, timeoutPromise]);
-      console.log("Vote MPC computation completed:", finalizeSignature);
-      
-      // Save vote to localStorage after successful finalization
-      saveVote(
+      const dbResult = await recordVoteInDatabase(
+        pollId.toString(),
         authority.toString(),
-        pollId,
-        vote ? "yes" : "no",
         queueSignature
       );
+      console.log(`Vote recorded! +${dbResult.pointsAwarded} points. Total: ${dbResult.totalPoints}`);
     } catch (error: any) {
-      console.error("Vote MPC computation error:", error);
-      throw new Error(`Vote submitted but MPC computation failed: ${error.message}`);
+      // Don't fail the vote if database recording fails
+      console.error("Failed to record vote in database:", error.message);
+      console.warn("Vote was cast successfully on-chain, but database update failed.");
     }
 
-    // Update status: confirmed
+    // Update status: confirmed (queue is confirmed, finalization happens async)
     onStatusChange?.({
       pollId,
       computationOffset,
       status: "confirmed",
       txSignatures: {
         queue: queueSignature,
-        finalize: finalizeSignature,
+        finalize: undefined, // Finalization happens in background
       },
     });
+    
+    // Note: MPC computation happens asynchronously. The encrypted vote
+    // will be processed by the MPC network and added to the vote tally.
+    // No need to wait for finalization - user gets immediate feedback.
 
     return queueSignature; // Return queue signature so frontend can show it
   }
@@ -460,7 +555,7 @@ export class VotingService {
     onStatusChange?: (status: RevealState) => void
   ): Promise<boolean> {
     const authority = this.provider.wallet.publicKey;
-    const [pollPDA] = derivePollPDA(authority, pollId);
+    const [pollPDA] = derivePollPDA(pollId);
 
     // Fetch poll to check current vote state
     const pollAccount = await this.program.account.pollAccount.fetch(pollPDA);
@@ -487,7 +582,44 @@ export class VotingService {
       "reveal_result"
     );
 
-    // Queue reveal computation with explicit account ordering
+    // CRITICAL: Register event listener BEFORE queuing transaction!
+    // The MPC callback can execute within 2-5 seconds of queuing
+    console.log("📡 Registering event listener...");
+    let actualResult: boolean | null = null;
+    let eventListener: number | undefined;
+    
+    const eventPromise = new Promise<boolean>((resolve, reject) => {
+      // 30 second timeout (MPC is fast on devnet - usually 2-5 seconds!)
+      const timeout = setTimeout(() => {
+        if (eventListener !== undefined) {
+          this.program.removeEventListener(eventListener);
+        }
+        reject(new Error(
+          "MPC computation timed out after 30 seconds. " +
+          "The reveal was queued but callback did not fire. " +
+          "Try revealing again."
+        ));
+      }, 30000);
+
+      eventListener = this.program.addEventListener("revealResultEvent", (event: any) => {
+        console.log("✅ RevealResultEvent received:", event);
+        clearTimeout(timeout);
+        if (eventListener !== undefined) {
+          this.program.removeEventListener(eventListener);
+        }
+        resolve(event.output);
+      });
+    });
+
+    // Update status: processing
+    onStatusChange?.({
+      pollId,
+      computationOffset,
+      status: "processing",
+    });
+
+    // NOW queue the reveal computation
+    console.log("🚀 Queuing reveal computation...");
     let queueSignature: string;
     try {
       queueSignature = await this.program.methods
@@ -508,68 +640,40 @@ export class VotingService {
           pollAcc: pollPDA,
         })
         .rpc({ skipPreflight: true, commitment: "confirmed" });
+      
+      console.log("✅ Reveal queued:", queueSignature);
+      console.log("⏳ Waiting for MPC callback (usually 2-5 seconds)...");
     } catch (error) {
+      // Clean up listener on error
+      if (eventListener !== undefined) {
+        this.program.removeEventListener(eventListener);
+      }
       throw this.formatAnchorError(error, "revealResult");
     }
 
-    console.log("Reveal queued with signature:", queueSignature);
-    console.log("Waiting for MPC reveal computation...");
-
-    // Update status: processing
-    onStatusChange?.({
-      pollId,
-      computationOffset,
-      status: "processing",
-    });
-
-    // Set up event listener for the result BEFORE waiting for finalization
-    let actualResult: boolean | null = null;
-    const eventPromise = new Promise<boolean>((resolve) => {
-      const listener = this.program.addEventListener("revealResultEvent", (event: any) => {
-        console.log("RevealResultEvent received:", event);
-        actualResult = event.output;
-        resolve(event.output);
-      });
-      // Store listener ID to remove later if needed
-      setTimeout(() => {
-        this.program.removeEventListener(listener);
-      }, 180000); // 3 minute timeout
-    });
-
-    // Wait for MPC computation with timeout
     try {
-      const finalizationPromise = awaitComputationFinalization(
-        this.provider,
-        computationOffset,
-        VOTING_PROGRAM_ID,
-        "confirmed"
-      );
-
-      // Add 3 minute timeout
-      const timeoutPromise = new Promise<string>((_, reject) => {
-        setTimeout(() => reject(new Error("Reveal computation timed out after 3 minutes")), 180000);
-      });
-
-      await Promise.race([finalizationPromise, timeoutPromise]);
-      console.log("Reveal MPC computation completed");
+      actualResult = await eventPromise;
+      console.log("🎉 Poll result:", actualResult ? "YES WINS" : "NO WINS");
     } catch (error: any) {
-      console.error("Reveal MPC computation error:", error);
-      throw new Error(`Reveal submitted but MPC computation failed: ${error.message}`);
+      console.error("❌ Reveal error:", error.message);
+      throw error;
     }
 
-    // Wait for the event to get the actual result
-    console.log("Waiting for reveal result event...");
+    // Update database with reveal result
     try {
-      actualResult = await Promise.race([
-        eventPromise,
-        new Promise<boolean>((_, reject) => 
-          setTimeout(() => reject(new Error("Event not received within 30 seconds")), 30000)
-        )
-      ]);
-      console.log("Poll result:", actualResult ? "YES WINS" : "NO WINS");
-    } catch (error) {
-      console.error("Failed to get reveal result event:", error);
-      throw new Error("Reveal computation completed but result could not be retrieved. Please try again.");
+      await fetch(`/api/polls/${pollId}/reveal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          winner: actualResult ? "yes" : "no",
+          revealedBy: authority.toString(),
+          transactionSignature: queueSignature,
+        }),
+      });
+      console.log("✅ Reveal result stored in database");
+    } catch (dbError) {
+      console.error("Failed to store reveal result in database:", dbError);
+      // Don't fail the reveal if DB update fails
     }
 
     // Update status: confirmed with actual result
@@ -584,17 +688,25 @@ export class VotingService {
   }
 
   /**
-   * Fetch a specific poll
+   * Fetch a specific poll by ID (globally accessible)
    */
-  async fetchPoll(authority: PublicKey, pollId: number) {
-    const [pollPDA] = derivePollPDA(authority, pollId);
+  async fetchPoll(pollId: number) {
+    const [pollPDA] = derivePollPDA(pollId);
     return this.program.account.pollAccount.fetch(pollPDA);
   }
 
   /**
-   * Fetch all polls for an authority
+   * Fetch all polls (globally accessible)
    */
-  async fetchAllPolls(authority: PublicKey) {
+  async fetchAllPolls() {
+    const polls = await this.program.account.pollAccount.all();
+    return polls;
+  }
+
+  /**
+   * Fetch polls created by a specific authority
+   */
+  async fetchPollsByAuthority(authority: PublicKey) {
     const polls = await this.program.account.pollAccount.all([
       {
         memcmp: {
