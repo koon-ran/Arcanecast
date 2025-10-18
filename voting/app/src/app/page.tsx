@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { WalletButton } from "@/components/WalletButton";
 import { CreatePollForm } from "@/components/CreatePollForm";
 import { PollList } from "@/components/PollList";
@@ -14,16 +15,35 @@ export default function HomePage() {
       <header className="border-b border-purple-500/20 backdrop-blur-sm sticky top-0 z-50 bg-black/50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="text-4xl">🔮</div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-                  ArcaneCast
-                </h1>
-                <p className="text-xs text-gray-400">
-                  Confidential Voting Powered by Arcium
-                </p>
-              </div>
+            <div className="flex items-center gap-8">
+              <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                <div className="text-4xl">🔮</div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                    ArcaneCast
+                  </h1>
+                  <p className="text-xs text-gray-400">
+                    Confidential Voting Powered by Arcium
+                  </p>
+                </div>
+              </Link>
+              
+              {/* Navigation */}
+              <nav className="hidden md:flex items-center gap-6">
+                <Link 
+                  href="/"
+                  className="text-sm font-medium text-purple-400 hover:text-purple-300 transition-colors"
+                >
+                  Polls
+                </Link>
+                <Link 
+                  href="/dao"
+                  className="text-sm font-medium text-gray-400 hover:text-purple-300 transition-colors flex items-center gap-2"
+                >
+                  <span>🏛️</span>
+                  <span>DAO Governance</span>
+                </Link>
+              </nav>
             </div>
             <WalletButton />
           </div>

@@ -5,8 +5,11 @@ use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChain
 const COMP_DEF_OFFSET_INIT_VOTE_STATS: u32 = comp_def_offset("init_vote_stats");
 const COMP_DEF_OFFSET_VOTE: u32 = comp_def_offset("vote");
 const COMP_DEF_OFFSET_REVEAL: u32 = comp_def_offset("reveal_result");
+const COMP_DEF_OFFSET_INIT_MULTI_OPTION_VOTE_STATS: u32 = comp_def_offset("init_multi_option_vote_stats");
+const COMP_DEF_OFFSET_VOTE_MULTI_OPTION: u32 = comp_def_offset("vote_multi_option");
+const COMP_DEF_OFFSET_REVEAL_MULTI_OPTION: u32 = comp_def_offset("reveal_multi_option_result");
 
-declare_id!("FHuabcvigE645KXLy4KCFCLkLx1jLxi1nwFYs8ajWyYd");
+declare_id!("DZDFeQuWe8ULjVUjhY7qvPMHo4D2h8YCetv4VwwwE96X");
 
 #[arcium_program]
 pub mod voting {
@@ -238,6 +241,249 @@ pub mod voting {
         };
 
         emit!(RevealResultEvent { output: o });
+
+        Ok(())
+    }
+
+    // ==================== MULTI-OPTION POLL INSTRUCTIONS ====================
+
+    pub fn init_multi_option_vote_stats_comp_def(ctx: Context<InitMultiOptionVoteStatsCompDef>) -> Result<()> {
+        init_comp_def(
+            ctx.accounts,
+            true,
+            0,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/init_multi_option_vote_stats_testnet.arcis".to_string(),
+                hash: [0; 32],
+            })),
+            None,
+        )?;
+        Ok(())
+    }
+
+    /// Creates a new multi-option poll (2-4 options) for DAO voting.
+    ///
+    /// This initializes a multi-option poll account and sets up the encrypted vote counters.
+    /// Each option gets its own encrypted counter, and all votes remain confidential until reveal.
+    ///
+    /// # Arguments
+    /// * `id` - Unique identifier for this poll
+    /// * `question` - The poll question
+    /// * `options` - Array of 2-4 option strings
+    /// * `nonce` - Cryptographic nonce for initializing encrypted vote counters
+    pub fn create_multi_option_poll(
+        ctx: Context<CreateMultiOptionPoll>,
+        computation_offset: u64,
+        id: u32,
+        question: String,
+        options: Vec<String>,
+        nonce: u128,
+    ) -> Result<()> {
+        require!(options.len() >= 2 && options.len() <= 4, ErrorCode::InvalidOptionCount);
+        
+        msg!("Creating a new multi-option poll with {} options", options.len());
+
+        // Initialize the poll account with the provided parameters
+        ctx.accounts.poll_acc.question = question;
+        ctx.accounts.poll_acc.options = options;
+        ctx.accounts.poll_acc.bump = ctx.bumps.poll_acc;
+        ctx.accounts.poll_acc.id = id;
+        ctx.accounts.poll_acc.authority = ctx.accounts.payer.key();
+        ctx.accounts.poll_acc.nonce = nonce;
+        ctx.accounts.poll_acc.vote_state = [[0; 32]; 5]; // 4 option counters + num_options
+        ctx.accounts.poll_acc.num_options = ctx.accounts.poll_acc.options.len() as u8;
+
+        let args = vec![
+            Argument::PlaintextU128(nonce),
+            Argument::PlaintextU128(ctx.accounts.poll_acc.num_options as u128),
+        ];
+
+        ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+
+        // Initialize encrypted vote counters for all options through MPC
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            None,
+            vec![InitMultiOptionVoteStatsCallback::callback_ix(&[CallbackAccount {
+                pubkey: ctx.accounts.poll_acc.key(),
+                is_writable: true,
+            }])],
+        )?;
+
+        Ok(())
+    }
+
+    #[arcium_callback(encrypted_ix = "init_multi_option_vote_stats")]
+    pub fn init_multi_option_vote_stats_callback(
+        ctx: Context<InitMultiOptionVoteStatsCallback>,
+        output: ComputationOutputs<InitMultiOptionVoteStatsOutput>,
+    ) -> Result<()> {
+        let o = match output {
+            ComputationOutputs::Success(InitMultiOptionVoteStatsOutput { field_0 }) => field_0,
+            _ => return Err(ErrorCode::AbortedComputation.into()),
+        };
+
+        ctx.accounts.poll_acc.vote_state = o.ciphertexts;
+        ctx.accounts.poll_acc.nonce = o.nonce;
+
+        Ok(())
+    }
+
+    pub fn init_vote_multi_option_comp_def(ctx: Context<InitVoteMultiOptionCompDef>) -> Result<()> {
+        init_comp_def(
+            ctx.accounts,
+            true,
+            0,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/vote_multi_option_testnet.arcis".to_string(),
+                hash: [0; 32],
+            })),
+            None,
+        )?;
+        Ok(())
+    }
+
+    /// Submits an encrypted vote to a multi-option poll.
+    ///
+    /// The voter selects one option (0-3), which is encrypted and added to the
+    /// corresponding counter through MPC. Individual votes remain confidential.
+    ///
+    /// # Arguments
+    /// * `selected_option_encrypted` - Encrypted selected option index (0-3)
+    /// * `vote_encryption_pubkey` - Voter's public key for encryption
+    /// * `vote_nonce` - Cryptographic nonce for the vote encryption
+    pub fn vote_multi_option(
+        ctx: Context<VoteMultiOption>,
+        computation_offset: u64,
+        _id: u32,
+        selected_option_encrypted: [u8; 32],
+        vote_encryption_pubkey: [u8; 32],
+        vote_nonce: u128,
+    ) -> Result<()> {
+        let args = vec![
+            Argument::ArcisPubkey(vote_encryption_pubkey),
+            Argument::PlaintextU128(vote_nonce),
+            Argument::EncryptedU8(selected_option_encrypted),
+            Argument::PlaintextU128(ctx.accounts.poll_acc.nonce),
+            Argument::Account(
+                ctx.accounts.poll_acc.key(),
+                // Offset calculation: 8 bytes (discriminator) + 1 byte (bump)
+                8 + 1,
+                32 * 5, // 4 vote counters + num_options, each stored as 32-byte ciphertext
+            ),
+        ];
+
+        ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            None,
+            vec![VoteMultiOptionCallback::callback_ix(&[CallbackAccount {
+                pubkey: ctx.accounts.poll_acc.key(),
+                is_writable: true,
+            }])],
+        )?;
+        Ok(())
+    }
+
+    #[arcium_callback(encrypted_ix = "vote_multi_option")]
+    pub fn vote_multi_option_callback(
+        ctx: Context<VoteMultiOptionCallback>,
+        output: ComputationOutputs<VoteMultiOptionOutput>,
+    ) -> Result<()> {
+        let o = match output {
+            ComputationOutputs::Success(VoteMultiOptionOutput { field_0 }) => field_0,
+            _ => return Err(ErrorCode::AbortedComputation.into()),
+        };
+
+        ctx.accounts.poll_acc.vote_state = o.ciphertexts;
+        ctx.accounts.poll_acc.nonce = o.nonce;
+
+        let clock = Clock::get()?;
+        let current_timestamp = clock.unix_timestamp;
+
+        emit!(VoteEvent {
+            timestamp: current_timestamp,
+        });
+
+        Ok(())
+    }
+
+    pub fn init_reveal_multi_option_result_comp_def(ctx: Context<InitRevealMultiOptionResultCompDef>) -> Result<()> {
+        init_comp_def(
+            ctx.accounts,
+            true,
+            0,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/reveal_multi_option_result_testnet.arcis".to_string(),
+                hash: [0; 32],
+            })),
+            None,
+        )?;
+        Ok(())
+    }
+
+    /// Reveals the vote counts for a multi-option poll.
+    ///
+    /// Only the poll authority can call this function to decrypt and reveal
+    /// the vote counts for all options. Returns raw counts array [u64; 4].
+    ///
+    /// # Arguments
+    /// * `id` - The poll ID to reveal results for
+    pub fn reveal_multi_option_result(
+        ctx: Context<RevealMultiOptionVotingResult>,
+        computation_offset: u64,
+        id: u32,
+    ) -> Result<()> {
+        require!(
+            ctx.accounts.payer.key() == ctx.accounts.poll_acc.authority,
+            ErrorCode::InvalidAuthority
+        );
+
+        msg!("Revealing multi-option voting result for poll with id {}", id);
+
+        let args = vec![
+            Argument::PlaintextU128(ctx.accounts.poll_acc.nonce),
+            Argument::Account(
+                ctx.accounts.poll_acc.key(),
+                // Offset calculation: 8 bytes (discriminator) + 1 byte (bump)
+                8 + 1,
+                32 * 5, // 4 encrypted vote counters + num_options, 32 bytes each
+            ),
+        ];
+
+        ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            None,
+            vec![RevealMultiOptionResultCallback::callback_ix(&[])],
+        )?;
+        Ok(())
+    }
+
+    #[arcium_callback(encrypted_ix = "reveal_multi_option_result")]
+    pub fn reveal_multi_option_result_callback(
+        ctx: Context<RevealMultiOptionResultCallback>,
+        output: ComputationOutputs<RevealMultiOptionResultOutput>,
+    ) -> Result<()> {
+        let o = match output {
+            ComputationOutputs::Success(RevealMultiOptionResultOutput { field_0 }) => field_0,
+            _ => return Err(ErrorCode::AbortedComputation.into()),
+        };
+
+        emit!(RevealMultiOptionResultEvent { 
+            option_1_count: o[0],
+            option_2_count: o[1],
+            option_3_count: o[2],
+            option_4_count: o[3],
+        });
 
         Ok(())
     }
@@ -536,6 +782,301 @@ pub struct InitRevealResultCompDef<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ==================== MULTI-OPTION POLL ACCOUNT STRUCTS ====================
+
+#[queue_computation_accounts("init_multi_option_vote_stats", payer)]
+#[derive(Accounts)]
+#[instruction(computation_offset: u64, id: u32)]
+pub struct CreateMultiOptionPoll<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        space = 9,
+        payer = payer,
+        seeds = [&SIGN_PDA_SEED],
+        bump,
+        address = derive_sign_pda!(),
+    )]
+    pub sign_pda_account: Account<'info, SignerAccount>,
+    #[account(
+        address = derive_mxe_pda!()
+    )]
+    pub mxe_account: Account<'info, MXEAccount>,
+    #[account(
+        mut,
+        address = derive_mempool_pda!()
+    )]
+    /// CHECK: mempool_account, checked by the arcium program
+    pub mempool_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        address = derive_execpool_pda!()
+    )]
+    /// CHECK: executing_pool, checked by the arcium program
+    pub executing_pool: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        address = derive_comp_pda!(computation_offset)
+    )]
+    /// CHECK: computation_account, checked by the arcium program.
+    pub computation_account: UncheckedAccount<'info>,
+    #[account(
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_INIT_MULTI_OPTION_VOTE_STATS)
+    )]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    #[account(
+        mut,
+        address = derive_cluster_pda!(mxe_account)
+    )]
+    pub cluster_account: Account<'info, Cluster>,
+    #[account(
+        mut,
+        address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS,
+    )]
+    pub pool_account: Account<'info, FeePool>,
+    #[account(
+        address = ARCIUM_CLOCK_ACCOUNT_ADDRESS,
+    )]
+    pub clock_account: Account<'info, ClockAccount>,
+    pub system_program: Program<'info, System>,
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + MultiOptionPollAccount::INIT_SPACE,
+        seeds = [b"multi_poll", id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub poll_acc: Account<'info, MultiOptionPollAccount>,
+}
+
+#[callback_accounts("init_multi_option_vote_stats")]
+#[derive(Accounts)]
+pub struct InitMultiOptionVoteStatsCallback<'info> {
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_INIT_MULTI_OPTION_VOTE_STATS)
+    )]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
+    /// CHECK: instructions_sysvar, checked by the account constraint
+    pub instructions_sysvar: AccountInfo<'info>,
+    /// CHECK: poll_acc, checked by the callback account key passed in queue_computation
+    #[account(mut)]
+    pub poll_acc: Account<'info, MultiOptionPollAccount>,
+}
+
+#[init_computation_definition_accounts("init_multi_option_vote_stats", payer)]
+#[derive(Accounts)]
+pub struct InitMultiOptionVoteStatsCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        address = derive_mxe_pda!()
+    )]
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
+    #[account(mut)]
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    pub comp_def_account: UncheckedAccount<'info>,
+    pub arcium_program: Program<'info, Arcium>,
+    pub system_program: Program<'info, System>,
+}
+
+#[queue_computation_accounts("vote_multi_option", payer)]
+#[derive(Accounts)]
+#[instruction(computation_offset: u64, _id: u32)]
+pub struct VoteMultiOption<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        space = 9,
+        payer = payer,
+        seeds = [&SIGN_PDA_SEED],
+        bump,
+        address = derive_sign_pda!(),
+    )]
+    pub sign_pda_account: Account<'info, SignerAccount>,
+    #[account(
+        address = derive_mxe_pda!()
+    )]
+    pub mxe_account: Account<'info, MXEAccount>,
+    #[account(
+        mut,
+        address = derive_mempool_pda!()
+    )]
+    /// CHECK: mempool_account, checked by the arcium program
+    pub mempool_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        address = derive_execpool_pda!()
+    )]
+    /// CHECK: executing_pool, checked by the arcium program
+    pub executing_pool: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        address = derive_comp_pda!(computation_offset)
+    )]
+    /// CHECK: computation_account, checked by the arcium program.
+    pub computation_account: UncheckedAccount<'info>,
+    #[account(
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_VOTE_MULTI_OPTION)
+    )]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    #[account(
+        mut,
+        address = derive_cluster_pda!(mxe_account)
+    )]
+    pub cluster_account: Account<'info, Cluster>,
+    #[account(
+        mut,
+        address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS,
+    )]
+    pub pool_account: Account<'info, FeePool>,
+    #[account(
+        address = ARCIUM_CLOCK_ACCOUNT_ADDRESS,
+    )]
+    pub clock_account: Account<'info, ClockAccount>,
+    pub system_program: Program<'info, System>,
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(
+        seeds = [b"multi_poll", _id.to_le_bytes().as_ref()],
+        bump = poll_acc.bump,
+    )]
+    pub poll_acc: Account<'info, MultiOptionPollAccount>,
+}
+
+#[callback_accounts("vote_multi_option")]
+#[derive(Accounts)]
+pub struct VoteMultiOptionCallback<'info> {
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_VOTE_MULTI_OPTION)
+    )]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
+    /// CHECK: instructions_sysvar, checked by the account constraint
+    pub instructions_sysvar: AccountInfo<'info>,
+    #[account(mut)]
+    pub poll_acc: Account<'info, MultiOptionPollAccount>,
+}
+
+#[init_computation_definition_accounts("vote_multi_option", payer)]
+#[derive(Accounts)]
+pub struct InitVoteMultiOptionCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        address = derive_mxe_pda!()
+    )]
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
+    #[account(mut)]
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    pub comp_def_account: UncheckedAccount<'info>,
+    pub arcium_program: Program<'info, Arcium>,
+    pub system_program: Program<'info, System>,
+}
+
+#[queue_computation_accounts("reveal_multi_option_result", payer)]
+#[derive(Accounts)]
+#[instruction(computation_offset: u64, id: u32)]
+pub struct RevealMultiOptionVotingResult<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        space = 9,
+        payer = payer,
+        seeds = [&SIGN_PDA_SEED],
+        bump,
+        address = derive_sign_pda!(),
+    )]
+    pub sign_pda_account: Account<'info, SignerAccount>,
+    #[account(
+        address = derive_mxe_pda!()
+    )]
+    pub mxe_account: Account<'info, MXEAccount>,
+    #[account(
+        mut,
+        address = derive_mempool_pda!()
+    )]
+    /// CHECK: mempool_account, checked by the arcium program
+    pub mempool_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        address = derive_execpool_pda!()
+    )]
+    /// CHECK: executing_pool, checked by the arcium program
+    pub executing_pool: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        address = derive_comp_pda!(computation_offset)
+    )]
+    /// CHECK: computation_account, checked by the arcium program.
+    pub computation_account: UncheckedAccount<'info>,
+    #[account(
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_REVEAL_MULTI_OPTION)
+    )]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    #[account(
+        mut,
+        address = derive_cluster_pda!(mxe_account)
+    )]
+    pub cluster_account: Account<'info, Cluster>,
+    #[account(
+        mut,
+        address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS,
+    )]
+    pub pool_account: Account<'info, FeePool>,
+    #[account(
+        address = ARCIUM_CLOCK_ACCOUNT_ADDRESS,
+    )]
+    pub clock_account: Account<'info, ClockAccount>,
+    pub system_program: Program<'info, System>,
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(
+        seeds = [b"multi_poll", id.to_le_bytes().as_ref()],
+        bump = poll_acc.bump
+    )]
+    pub poll_acc: Account<'info, MultiOptionPollAccount>,
+}
+
+#[callback_accounts("reveal_multi_option_result")]
+#[derive(Accounts)]
+pub struct RevealMultiOptionResultCallback<'info> {
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_REVEAL_MULTI_OPTION)
+    )]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
+    /// CHECK: instructions_sysvar, checked by the account constraint
+    pub instructions_sysvar: AccountInfo<'info>,
+}
+
+#[init_computation_definition_accounts("reveal_multi_option_result", payer)]
+#[derive(Accounts)]
+pub struct InitRevealMultiOptionResultCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        address = derive_mxe_pda!()
+    )]
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
+    #[account(mut)]
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    pub comp_def_account: UncheckedAccount<'info>,
+    pub arcium_program: Program<'info, Arcium>,
+    pub system_program: Program<'info, System>,
+}
+
 /// Represents a confidential poll with encrypted vote tallies.
 #[account]
 #[derive(InitSpace)]
@@ -555,6 +1096,30 @@ pub struct PollAccount {
     pub question: String,
 }
 
+/// Represents a multi-option poll (2-4 options) for DAO voting.
+#[account]
+#[derive(InitSpace)]
+pub struct MultiOptionPollAccount {
+    /// PDA bump seed
+    pub bump: u8,
+    /// Encrypted vote counters: [option1, option2, option3, option4, num_options] as 32-byte ciphertexts
+    pub vote_state: [[u8; 32]; 5],
+    /// Unique identifier for this poll
+    pub id: u32,
+    /// Public key of the poll creator (only they can reveal results)
+    pub authority: Pubkey,
+    /// Cryptographic nonce for the encrypted vote counters
+    pub nonce: u128,
+    /// The poll question (max 100 characters)
+    #[max_len(100)]
+    pub question: String,
+    /// Poll options (2-4 strings, max 50 characters each)
+    #[max_len(4, 50)]
+    pub options: Vec<String>,
+    /// Number of options (2-4)
+    pub num_options: u8,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Invalid authority")]
@@ -563,6 +1128,8 @@ pub enum ErrorCode {
     AbortedComputation,
     #[msg("Cluster not set")]
     ClusterNotSet,
+    #[msg("Invalid option count - must be between 2 and 4")]
+    InvalidOptionCount,
 }
 
 #[event]
@@ -573,4 +1140,12 @@ pub struct VoteEvent {
 #[event]
 pub struct RevealResultEvent {
     pub output: bool,
+}
+
+#[event]
+pub struct RevealMultiOptionResultEvent {
+    pub option_1_count: u64,
+    pub option_2_count: u64,
+    pub option_3_count: u64,
+    pub option_4_count: u64,
 }

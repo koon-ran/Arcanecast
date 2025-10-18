@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/voting.json`.
  */
 export type Voting = {
-  "address": "FHuabcvigE645KXLy4KCFCLkLx1jLxi1nwFYs8ajWyYd",
+  "address": "DZDFeQuWe8ULjVUjhY7qvPMHo4D2h8YCetv4VwwwE96X",
   "metadata": {
     "name": "voting",
     "version": "0.1.0",
@@ -13,6 +13,154 @@ export type Voting = {
     "description": "Created with Arcium & Anchor"
   },
   "instructions": [
+    {
+      "name": "createMultiOptionPoll",
+      "docs": [
+        "Creates a new multi-option poll (2-4 options) for DAO voting.",
+        "",
+        "This initializes a multi-option poll account and sets up the encrypted vote counters.",
+        "Each option gets its own encrypted counter, and all votes remain confidential until reveal.",
+        "",
+        "# Arguments",
+        "* `id` - Unique identifier for this poll",
+        "* `question` - The poll question",
+        "* `options` - Array of 2-4 option strings",
+        "* `nonce` - Cryptographic nonce for initializing encrypted vote counters"
+      ],
+      "discriminator": [
+        145,
+        208,
+        171,
+        221,
+        68,
+        200,
+        248,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "signPdaAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  83,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114,
+                  65,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mxeAccount"
+        },
+        {
+          "name": "mempoolAccount",
+          "writable": true
+        },
+        {
+          "name": "executingPool",
+          "writable": true
+        },
+        {
+          "name": "computationAccount",
+          "writable": true
+        },
+        {
+          "name": "compDefAccount"
+        },
+        {
+          "name": "clusterAccount",
+          "writable": true
+        },
+        {
+          "name": "poolAccount",
+          "writable": true,
+          "address": "7MGSS4iKNM4sVib7bDZDJhVqB6EcchPwVnTKenCY1jt3"
+        },
+        {
+          "name": "clockAccount",
+          "address": "FHriyvoZotYiFnbUzKFjzRSb2NiaC8RPWY7jtKuKhg65"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "pollAcc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  108,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "computationOffset",
+          "type": "u64"
+        },
+        {
+          "name": "id",
+          "type": "u32"
+        },
+        {
+          "name": "question",
+          "type": "string"
+        },
+        {
+          "name": "options",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u128"
+        }
+      ]
+    },
     {
       "name": "createNewPoll",
       "docs": [
@@ -150,6 +298,136 @@ export type Voting = {
       ]
     },
     {
+      "name": "initMultiOptionVoteStatsCallback",
+      "discriminator": [
+        252,
+        150,
+        167,
+        148,
+        83,
+        170,
+        253,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "compDefAccount"
+        },
+        {
+          "name": "instructionsSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "pollAcc",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "output",
+          "type": {
+            "defined": {
+              "name": "computationOutputs",
+              "generics": [
+                {
+                  "kind": "type",
+                  "type": {
+                    "defined": {
+                      "name": "initMultiOptionVoteStatsOutput"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initMultiOptionVoteStatsCompDef",
+      "discriminator": [
+        212,
+        156,
+        203,
+        234,
+        42,
+        36,
+        225,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mxeAccount",
+          "writable": true
+        },
+        {
+          "name": "compDefAccount",
+          "docs": [
+            "Can't check it here as it's not initialized yet."
+          ],
+          "writable": true
+        },
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initRevealMultiOptionResultCompDef",
+      "discriminator": [
+        141,
+        249,
+        2,
+        63,
+        199,
+        79,
+        44,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mxeAccount",
+          "writable": true
+        },
+        {
+          "name": "compDefAccount",
+          "docs": [
+            "Can't check it here as it's not initialized yet."
+          ],
+          "writable": true
+        },
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initRevealResultCompDef",
       "discriminator": [
         37,
@@ -200,6 +478,46 @@ export type Voting = {
         37,
         236,
         155
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mxeAccount",
+          "writable": true
+        },
+        {
+          "name": "compDefAccount",
+          "docs": [
+            "Can't check it here as it's not initialized yet."
+          ],
+          "writable": true
+        },
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initVoteMultiOptionCompDef",
+      "discriminator": [
+        69,
+        101,
+        4,
+        29,
+        154,
+        102,
+        90,
+        210
       ],
       "accounts": [
         {
@@ -318,6 +636,182 @@ export type Voting = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "revealMultiOptionResult",
+      "docs": [
+        "Reveals the vote counts for a multi-option poll.",
+        "",
+        "Only the poll authority can call this function to decrypt and reveal",
+        "the vote counts for all options. Returns raw counts array [u64; 4].",
+        "",
+        "# Arguments",
+        "* `id` - The poll ID to reveal results for"
+      ],
+      "discriminator": [
+        87,
+        93,
+        96,
+        242,
+        44,
+        167,
+        138,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "signPdaAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  83,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114,
+                  65,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mxeAccount"
+        },
+        {
+          "name": "mempoolAccount",
+          "writable": true
+        },
+        {
+          "name": "executingPool",
+          "writable": true
+        },
+        {
+          "name": "computationAccount",
+          "writable": true
+        },
+        {
+          "name": "compDefAccount"
+        },
+        {
+          "name": "clusterAccount",
+          "writable": true
+        },
+        {
+          "name": "poolAccount",
+          "writable": true,
+          "address": "7MGSS4iKNM4sVib7bDZDJhVqB6EcchPwVnTKenCY1jt3"
+        },
+        {
+          "name": "clockAccount",
+          "address": "FHriyvoZotYiFnbUzKFjzRSb2NiaC8RPWY7jtKuKhg65"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "pollAcc",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  108,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "computationOffset",
+          "type": "u64"
+        },
+        {
+          "name": "id",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "revealMultiOptionResultCallback",
+      "discriminator": [
+        40,
+        70,
+        170,
+        124,
+        69,
+        158,
+        190,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "compDefAccount"
+        },
+        {
+          "name": "instructionsSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "output",
+          "type": {
+            "defined": {
+              "name": "computationOutputs",
+              "generics": [
+                {
+                  "kind": "type",
+                  "type": {
+                    "defined": {
+                      "name": "revealMultiOptionResultOutput"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "name": "revealResult",
@@ -688,6 +1182,210 @@ export type Voting = {
           }
         }
       ]
+    },
+    {
+      "name": "voteMultiOption",
+      "docs": [
+        "Submits an encrypted vote to a multi-option poll.",
+        "",
+        "The voter selects one option (0-3), which is encrypted and added to the",
+        "corresponding counter through MPC. Individual votes remain confidential.",
+        "",
+        "# Arguments",
+        "* `selected_option_encrypted` - Encrypted selected option index (0-3)",
+        "* `vote_encryption_pubkey` - Voter's public key for encryption",
+        "* `vote_nonce` - Cryptographic nonce for the vote encryption"
+      ],
+      "discriminator": [
+        80,
+        99,
+        113,
+        248,
+        53,
+        170,
+        222,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "signPdaAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  83,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114,
+                  65,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mxeAccount"
+        },
+        {
+          "name": "mempoolAccount",
+          "writable": true
+        },
+        {
+          "name": "executingPool",
+          "writable": true
+        },
+        {
+          "name": "computationAccount",
+          "writable": true
+        },
+        {
+          "name": "compDefAccount"
+        },
+        {
+          "name": "clusterAccount",
+          "writable": true
+        },
+        {
+          "name": "poolAccount",
+          "writable": true,
+          "address": "7MGSS4iKNM4sVib7bDZDJhVqB6EcchPwVnTKenCY1jt3"
+        },
+        {
+          "name": "clockAccount",
+          "address": "FHriyvoZotYiFnbUzKFjzRSb2NiaC8RPWY7jtKuKhg65"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "pollAcc",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  108,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "computationOffset",
+          "type": "u64"
+        },
+        {
+          "name": "id",
+          "type": "u32"
+        },
+        {
+          "name": "selectedOptionEncrypted",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "voteEncryptionPubkey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "voteNonce",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "voteMultiOptionCallback",
+      "discriminator": [
+        223,
+        138,
+        7,
+        233,
+        50,
+        203,
+        221,
+        191
+      ],
+      "accounts": [
+        {
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
+        },
+        {
+          "name": "compDefAccount"
+        },
+        {
+          "name": "instructionsSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "pollAcc",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "output",
+          "type": {
+            "defined": {
+              "name": "computationOutputs",
+              "generics": [
+                {
+                  "kind": "type",
+                  "type": {
+                    "defined": {
+                      "name": "voteMultiOptionOutput"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -757,6 +1455,19 @@ export type Voting = {
       ]
     },
     {
+      "name": "multiOptionPollAccount",
+      "discriminator": [
+        154,
+        48,
+        253,
+        202,
+        187,
+        30,
+        226,
+        212
+      ]
+    },
+    {
       "name": "pollAccount",
       "discriminator": [
         109,
@@ -784,6 +1495,19 @@ export type Voting = {
     }
   ],
   "events": [
+    {
+      "name": "revealMultiOptionResultEvent",
+      "discriminator": [
+        13,
+        44,
+        202,
+        4,
+        94,
+        61,
+        41,
+        67
+      ]
+    },
     {
       "name": "revealResultEvent",
       "discriminator": [
@@ -1155,6 +1879,32 @@ export type Voting = {
       }
     },
     {
+      "name": "initMultiOptionVoteStatsOutput",
+      "docs": [
+        "The output of the callback instruction. Provided as a struct with ordered fields",
+        "as anchor does not support tuples and tuple structs yet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field0",
+            "type": {
+              "defined": {
+                "name": "mxeEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "5"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "initVoteStatsOutput",
       "docs": [
         "The output of the callback instruction. Provided as a struct with ordered fields",
@@ -1275,6 +2025,85 @@ export type Voting = {
                 }
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiOptionPollAccount",
+      "docs": [
+        "Represents a multi-option poll (2-4 options) for DAO voting."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "voteState",
+            "docs": [
+              "Encrypted vote counters: [option1, option2, option3, option4, num_options] as 32-byte ciphertexts"
+            ],
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                5
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "docs": [
+              "Unique identifier for this poll"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Public key of the poll creator (only they can reveal results)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Cryptographic nonce for the encrypted vote counters"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "question",
+            "docs": [
+              "The poll question (max 100 characters)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "options",
+            "docs": [
+              "Poll options (2-4 strings, max 50 characters each)"
+            ],
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "numOptions",
+            "docs": [
+              "Number of options (2-4)"
+            ],
+            "type": "u8"
           }
         ]
       }
@@ -1497,6 +2326,51 @@ export type Voting = {
       }
     },
     {
+      "name": "revealMultiOptionResultEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "option1Count",
+            "type": "u64"
+          },
+          {
+            "name": "option2Count",
+            "type": "u64"
+          },
+          {
+            "name": "option3Count",
+            "type": "u64"
+          },
+          {
+            "name": "option4Count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "revealMultiOptionResultOutput",
+      "docs": [
+        "The output of the callback instruction. Provided as a struct with ordered fields",
+        "as anchor does not support tuples and tuple structs yet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field0",
+            "type": {
+              "array": [
+                "u64",
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "revealResultEvent",
       "type": {
         "kind": "struct",
@@ -1556,6 +2430,32 @@ export type Voting = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "voteMultiOptionOutput",
+      "docs": [
+        "The output of the callback instruction. Provided as a struct with ordered fields",
+        "as anchor does not support tuples and tuple structs yet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field0",
+            "type": {
+              "defined": {
+                "name": "mxeEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "5"
+                  }
+                ]
+              }
+            }
           }
         ]
       }
