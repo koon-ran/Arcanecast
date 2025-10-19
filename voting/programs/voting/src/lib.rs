@@ -253,7 +253,7 @@ pub mod voting {
             true,
             0,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/init_multi_option_vote_stats_testnet.arcis".to_string(),
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/init_multi_option_vote_stats_v2.arcis".to_string(),
                 hash: [0; 32],
             })),
             None,
@@ -339,7 +339,7 @@ pub mod voting {
             true,
             0,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/vote_multi_option_testnet.arcis".to_string(),
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/vote_multi_option_v2.arcis".to_string(),
                 hash: [0; 32],
             })),
             None,
@@ -421,7 +421,7 @@ pub mod voting {
             true,
             0,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/reveal_multi_option_result_testnet.arcis".to_string(),
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/reveal_multi_option_result_v2.arcis".to_string(),
                 hash: [0; 32],
             })),
             None,
