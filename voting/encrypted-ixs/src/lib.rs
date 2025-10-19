@@ -39,19 +39,15 @@ mod circuits {
     /// Initializes encrypted vote counters for a multi-option poll.
     ///
     /// Creates a MultiOptionVoteStats structure with zero counts for all options.
-    /// The num_options parameter (2-4) indicates how many options are actually used.
+    /// The num_options will be set from the poll account data during initialization.
     ///
-    /// # Arguments
-    /// * `num_options` - Number of options in the poll (must be 2-4)
+    /// NOTE: This circuit initializes with default values. The actual num_options
+    /// is stored in the poll account and validated during voting.
     #[instruction]
-    pub fn init_multi_option_vote_stats(
-        mxe: Mxe,
-        num_options_ctxt: Enc<Mxe, u8>,
-    ) -> Enc<Mxe, MultiOptionVoteStats> {
-        let num_options = num_options_ctxt.to_arcis();
+    pub fn init_multi_option_vote_stats(mxe: Mxe) -> Enc<Mxe, MultiOptionVoteStats> {
         let vote_stats = MultiOptionVoteStats {
             option_counts: [0, 0, 0, 0],
-            num_options,
+            num_options: 0, // Will be set by the program from poll account
         };
         mxe.from_arcis(vote_stats)
     }
