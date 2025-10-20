@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/voting.json`.
  */
 export type Voting = {
-  "address": "DZDFeQuWe8ULjVUjhY7qvPMHo4D2h8YCetv4VwwwE96X",
+  "address": "25aB1D3Q1rtrJDuhME83HpfLoWLvZMuFmtYnH7UvMDLb",
   "metadata": {
     "name": "voting",
     "version": "0.1.0",
@@ -1538,13 +1538,23 @@ export type Voting = {
   "errors": [
     {
       "code": 6000,
-      "name": "invalidFinalizeTx",
-      "msg": "Invalid finalize transaction"
+      "name": "invalidAuthority",
+      "msg": "Invalid authority"
     },
     {
       "code": 6001,
-      "name": "invalidAccount",
-      "msg": "Invalid account"
+      "name": "abortedComputation",
+      "msg": "The computation was aborted"
+    },
+    {
+      "code": 6002,
+      "name": "clusterNotSet",
+      "msg": "Cluster not set"
+    },
+    {
+      "code": 6003,
+      "name": "invalidOptionCount",
+      "msg": "Invalid option count - must be between 2 and 4"
     }
   ],
   "types": [

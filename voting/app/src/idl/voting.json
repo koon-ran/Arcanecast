@@ -1,5 +1,5 @@
 {
-  "address": "DZDFeQuWe8ULjVUjhY7qvPMHo4D2h8YCetv4VwwwE96X",
+  "address": "25aB1D3Q1rtrJDuhME83HpfLoWLvZMuFmtYnH7UvMDLb",
   "metadata": {
     "name": "voting",
     "version": "0.1.0",
@@ -1532,13 +1532,23 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidFinalizeTx",
-      "msg": "Invalid finalize transaction"
+      "name": "InvalidAuthority",
+      "msg": "Invalid authority"
     },
     {
       "code": 6001,
-      "name": "InvalidAccount",
-      "msg": "Invalid account"
+      "name": "AbortedComputation",
+      "msg": "The computation was aborted"
+    },
+    {
+      "code": 6002,
+      "name": "ClusterNotSet",
+      "msg": "Cluster not set"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidOptionCount",
+      "msg": "Invalid option count - must be between 2 and 4"
     }
   ],
   "types": [

@@ -9,7 +9,7 @@ const COMP_DEF_OFFSET_INIT_MULTI_OPTION_VOTE_STATS: u32 = comp_def_offset("init_
 const COMP_DEF_OFFSET_VOTE_MULTI_OPTION: u32 = comp_def_offset("vote_multi_option");
 const COMP_DEF_OFFSET_REVEAL_MULTI_OPTION: u32 = comp_def_offset("reveal_multi_option_result");
 
-declare_id!("DZDFeQuWe8ULjVUjhY7qvPMHo4D2h8YCetv4VwwwE96X");
+declare_id!("25aB1D3Q1rtrJDuhME83HpfLoWLvZMuFmtYnH7UvMDLb");
 
 #[arcium_program]
 pub mod voting {
@@ -253,7 +253,7 @@ pub mod voting {
             true,
             0,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/init_multi_option_vote_stats_testnet.arcis".to_string(),
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/init_multi_option_vote_stats_v2.arcis".to_string(),
                 hash: [0; 32],
             })),
             None,
@@ -293,9 +293,11 @@ pub mod voting {
         ctx.accounts.poll_acc.vote_state = [[0; 32]; 5]; // 4 option counters + num_options
         ctx.accounts.poll_acc.num_options = ctx.accounts.poll_acc.options.len() as u8;
 
+        // Like binary poll init, multi-option init only needs the nonce
+        // The circuit initializes counters to zero for all options
+        // num_options is read from the callback, not passed as argument
         let args = vec![
             Argument::PlaintextU128(nonce),
-            Argument::PlaintextU128(ctx.accounts.poll_acc.num_options as u128),
         ];
 
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
@@ -337,7 +339,7 @@ pub mod voting {
             true,
             0,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/vote_multi_option_testnet.arcis".to_string(),
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/vote_multi_option_v2.arcis".to_string(),
                 hash: [0; 32],
             })),
             None,
@@ -419,7 +421,7 @@ pub mod voting {
             true,
             0,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/reveal_multi_option_result_testnet.arcis".to_string(),
+                source: "https://raw.githubusercontent.com/koon-ran/Arcanecast/main/voting/build/reveal_multi_option_result_v2.arcis".to_string(),
                 hash: [0; 32],
             })),
             None,

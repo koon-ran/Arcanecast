@@ -3,6 +3,7 @@ import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import anchorPkg from '@coral-xyz/anchor';
 const { AnchorProvider, Program, Wallet, BN } = anchorPkg;
 import { readFileSync } from 'fs';
+import crypto from 'crypto';
 import {
   getMXEAccAddress,
   getCompDefAccOffset,
@@ -22,7 +23,7 @@ const supabase = createClient(
 );
 
 const connection = new Connection('https://api.devnet.solana.com');
-const PROGRAM_ID = new PublicKey('DZDFeQuWe8ULjVUjhY7qvPMHo4D2h8YCetv4VwwwE96X');
+const PROGRAM_ID = new PublicKey('25aB1D3Q1rtrJDuhME83HpfLoWLvZMuFmtYnH7UvMDLb');
 const ARCIUM_PROGRAM_ID = new PublicKey('BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6');
 const ARCIUM_FEE_POOL_ACCOUNT = new PublicKey('7MGSS4iKNM4sVib7bDZDJhVqB6EcchPwVnTKenCY1jt3');
 const ARCIUM_CLOCK_ACCOUNT = new PublicKey('FHriyvoZotYiFnbUzKFjzRSb2NiaC8RPWY7jtKuKhg65');
@@ -137,13 +138,24 @@ async function run() {
     // Derive all Arcium accounts (use multi-option comp def)
     const arciumAccounts = deriveArciumAccounts(computationOffset, 'init_multi_option_vote_stats');
 
+    // Validate and get options array
+    const options = Array.isArray(poll.options) ? poll.options : [];
+    const numOptions = options.length;
+    
+    if (numOptions < 2 || numOptions > 4) {
+      console.error(`   ❌ Invalid number of options: ${numOptions} (must be 2-4)\n`);
+      continue;
+    }
+
+    console.log(`   Creating poll with ${numOptions} options: ${JSON.stringify(options).substring(0, 80)}...`);
+
     try {
       const tx = await program.methods
         .createMultiOptionPoll(
           computationOffset,
           nextId,
           poll.question,
-          poll.options,
+          options,  // ← Pass the full options array (Vec<String>)
           new BN(deserializeLE(nonce).toString())
         )
         .accounts({
